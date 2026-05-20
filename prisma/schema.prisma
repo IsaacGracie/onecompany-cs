@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Customer {
+  id            Int       @id @default(autoincrement())
+  nickname      String
+  contactInfo   String?   @map("contact_info")
+  contactType   String    @default("wechat") @map("contact_type")
+  source        String    @default("other")
+  status        String    @default("new")
+  intentLevel   String    @default("unknown") @map("intent_level")
+  nextFollowAt  DateTime? @map("next_follow_at")
+  lastContactAt DateTime? @map("last_contact_at")
+  notes         String?
+  aiSummary     String?   @map("ai_summary")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  conversations Conversation[]
+  statusLogs    StatusLog[]
+
+  @@map("customers")
+}
+
+model Conversation {
+  id             Int      @id @default(autoincrement())
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId     Int      @map("customer_id")
+  senderType     String   @map("sender_type")
+  messageContent String   @map("message_content")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("conversations")
+}
+
+model StatusLog {
+  id         Int      @id @default(autoincrement())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId Int      @map("customer_id")
+  fromStatus String?  @map("from_status")
+  toStatus   String   @map("to_status")
+  changedBy  String   @default("human") @map("changed_by")
+  remark     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([customerId])
+  @@map("status_logs")
+}
+
+model KnowledgeBase {
+  id        Int      @id @default(autoincrement())
+  category  String
+  title     String
+  content   String
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("knowledge_base")
+}
