@@ -68,6 +68,49 @@ function getLabelFromValue(
   return items.find((i) => i.value === value)?.label || value;
 }
 
+// AI 分析字段中文映射
+const AI_INTENT_LABELS: Record<string, string> = {
+  inquiry_service: "咨询服务",
+  inquiry_price: "询问价格",
+  inquiry_process: "询问流程",
+  inquiry_timeline: "询问时间",
+  submit_requirement: "提交需求",
+  follow_up: "主动跟进",
+  complaint: "投诉",
+  casual_chat: "闲聊",
+  other: "其他",
+};
+
+const AI_INTENT_LEVEL_LABELS: Record<string, string> = {
+  high: "高",
+  medium: "中",
+  low: "低",
+  unknown: "未判断",
+};
+
+const AI_ACTION_LABELS: Record<string, string> = {
+  continue_collect: "继续收集信息",
+  collect_summary: "生成需求摘要",
+  quote_remind: "提醒人工报价",
+  human_follow_up: "建议人工跟进",
+  close_conversation: "可结束对话",
+  escalate: "紧急需人工介入",
+};
+
+const AI_MISSING_INFO_LABELS: Record<string, string> = {
+  project_type: "项目类型",
+  budget_range: "预算范围",
+  timeline: "期望时间",
+  key_features: "关键功能",
+  reference_examples: "参考案例",
+  background_info: "客户背景",
+  decision_maker: "决策人信息",
+};
+
+function getAiLabel(map: Record<string, string>, value: string): string {
+  return map[value] || value;
+}
+
 function formatDate(dateStr: string | null) {
   if (!dateStr) return "-";
   const d = new Date(dateStr);
@@ -108,6 +151,14 @@ export default function CustomerDetailPage() {
   const [newMessage, setNewMessage] = useState("");
   const [newSenderType, setNewSenderType] = useState("human");
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<{
+    reply: string;
+    analysis: Record<string, unknown>;
+    suggestConfirm: boolean;
+    statusChanged: { from: string; to: string } | null;
+  } | null>(null);
 
   const [editForm, setEditForm] = useState({
     nickname: "",
@@ -266,6 +317,45 @@ export default function CustomerDetailPage() {
       setError("网络错误");
     } finally {
       setSendingMessage(false);
+    }
+  }
+
+  async function handleAiChat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!aiInput.trim()) return;
+
+    setAiLoading(true);
+    setAiResult(null);
+    setError("");
+
+    try {
+      const res = await fetch(`/api/customers/${customerId}/ai-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: aiInput.trim() }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "AI 接待失败");
+        return;
+      }
+
+      const data = await res.json();
+      setAiResult({
+        reply: data.aiMessage.content,
+        analysis: data.analysis,
+        suggestConfirm: data.suggestConfirm,
+        statusChanged: data.statusChanged,
+      });
+      setAiInput("");
+      fetchConversations();
+      fetchCustomer();
+      fetchStatusLogs();
+    } catch {
+      setError("AI 接待暂时不可用，请人工确认");
+    } finally {
+      setAiLoading(false);
     }
   }
 
@@ -581,6 +671,103 @@ export default function CustomerDetailPage() {
               </div>
             );
           })()}
+        </CardContent>
+      </Card>
+
+      {/* AI 接待 */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>AI 接待</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleAiChat} className="mb-4 flex gap-3">
+            <Input
+              placeholder="输入客户消息，点击 AI 接待..."
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              className="flex-1"
+              disabled={aiLoading}
+            />
+            <Button type="submit" disabled={aiLoading || !aiInput.trim()}>
+              {aiLoading ? "处理中..." : "AI 接待"}
+            </Button>
+          </form>
+
+          {aiResult && (
+            <div className="space-y-4">
+              {/* 状态变更提示 */}
+              {aiResult.statusChanged && (
+                <div className="rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  状态已自动变更：{getLabelFromValue(STATUSES, aiResult.statusChanged.from)} → {getLabelFromValue(STATUSES, aiResult.statusChanged.to)}
+                </div>
+              )}
+
+              {/* collect_summary 提示 */}
+              {aiResult.suggestConfirm && (
+                <div className="rounded-lg bg-yellow-50 px-4 py-3 text-sm dark:bg-yellow-950">
+                  <p className="font-medium text-yellow-800 dark:text-yellow-200">
+                    AI 建议转入需求确认
+                  </p>
+                  <p className="mt-1 text-yellow-700 dark:text-yellow-300">
+                    AI 已收集到足够信息，建议您查看需求摘要后决定是否将状态转为「需求确认」。
+                  </p>
+                </div>
+              )}
+
+              {/* AI 回复 */}
+              <div>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">AI 回复</p>
+                <div className="whitespace-pre-wrap rounded-lg bg-muted px-4 py-3 text-sm">
+                  {aiResult.reply}
+                </div>
+              </div>
+
+              {/* 结构化分析 */}
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">结构化分析</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-lg bg-muted/50 px-4 py-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">意图：</span>
+                    <span>{getAiLabel(AI_INTENT_LABELS, String(aiResult.analysis.intent))}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">意向等级：</span>
+                    <span>{getAiLabel(AI_INTENT_LEVEL_LABELS, String(aiResult.analysis.intent_level))}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">有效线索：</span>
+                    <span>{aiResult.analysis.is_effective_lead ? "是" : "否"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">建议人工：</span>
+                    <span>{aiResult.analysis.need_human ? "是" : "否"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">建议动作：</span>
+                    <span>{getAiLabel(AI_ACTION_LABELS, String(aiResult.analysis.suggested_action))}</span>
+                  </div>
+                  {typeof aiResult.analysis.summary === "string" && aiResult.analysis.summary && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">摘要：</span>
+                      <span>{String(aiResult.analysis.summary)}</span>
+                    </div>
+                  )}
+                  {Array.isArray(aiResult.analysis.missing_info) && (aiResult.analysis.missing_info as string[]).length > 0 && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">缺少信息：</span>
+                      <span>{(aiResult.analysis.missing_info as string[]).map((k) => getAiLabel(AI_MISSING_INFO_LABELS, k)).join("、")}</span>
+                    </div>
+                  )}
+                  {Array.isArray(aiResult.analysis.risk_flags) && (aiResult.analysis.risk_flags as string[]).length > 0 && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">风险标记：</span>
+                      <span className="text-destructive">{(aiResult.analysis.risk_flags as string[]).join("、")}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
