@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomers, createCustomer } from "@/lib/services/customer.service";
 import type { CustomerQueryParams, CreateCustomerInput } from "@/lib/types";
-import { STATUSES, INTENT_LEVELS, SOURCES, CONTACT_TYPES } from "@/lib/types";
-
-const validStatuses = STATUSES.map((s) => s.value);
-const validIntentLevels = INTENT_LEVELS.map((i) => i.value);
-const validSources = SOURCES.map((s) => s.value);
-const validContactTypes = CONTACT_TYPES.map((c) => c.value);
+import { VALID_STATUSES, VALID_INTENT_LEVELS, VALID_SOURCES, VALID_CONTACT_TYPES } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -17,17 +12,17 @@ export async function GET(request: NextRequest) {
   };
 
   const status = searchParams.get("status");
-  if (status && validStatuses.includes(status as typeof validStatuses[number])) {
+  if (status && VALID_STATUSES.includes(status)) {
     params.status = status as CustomerQueryParams["status"];
   }
 
   const intentLevel = searchParams.get("intentLevel");
-  if (intentLevel && validIntentLevels.includes(intentLevel as typeof validIntentLevels[number])) {
+  if (intentLevel && VALID_INTENT_LEVELS.includes(intentLevel)) {
     params.intentLevel = intentLevel as CustomerQueryParams["intentLevel"];
   }
 
   const source = searchParams.get("source");
-  if (source && validSources.includes(source as typeof validSources[number])) {
+  if (source && VALID_SOURCES.includes(source)) {
     params.source = source as CustomerQueryParams["source"];
   }
 
@@ -46,11 +41,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "nickname is required" }, { status: 400 });
     }
 
-    if (body.contactType && !validContactTypes.includes(body.contactType)) {
+    if (body.contactType && !VALID_CONTACT_TYPES.includes(body.contactType)) {
       return NextResponse.json({ error: `Invalid contactType: ${body.contactType}` }, { status: 400 });
     }
 
-    if (body.source && !validSources.includes(body.source)) {
+    if (body.source && !VALID_SOURCES.includes(body.source)) {
       return NextResponse.json({ error: `Invalid source: ${body.source}` }, { status: 400 });
     }
 

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { KNOWLEDGE_CATEGORIES } from "@/lib/types";
+import { getLabelFromValue, formatDate } from "@/lib/utils";
 
 interface KnowledgeItem {
   id: number;
@@ -24,18 +25,6 @@ interface KnowledgeItem {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-function getLabelFromValue(
-  items: readonly { value: string; label: string }[],
-  value: string
-) {
-  return items.find((i) => i.value === value)?.label || value;
-}
-
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function KnowledgePage() {
@@ -74,8 +63,35 @@ export default function KnowledgePage() {
   }, [categoryFilter]);
 
   useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+    let ignore = false;
+
+    async function loadItems() {
+      await Promise.resolve();
+      if (ignore) return;
+
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (categoryFilter) params.set("category", categoryFilter);
+
+        const res = await fetch(`/api/knowledge?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!ignore) setItems(data);
+        }
+      } catch {
+        if (!ignore) setError("鍔犺浇澶辫触");
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    void loadItems();
+
+    return () => {
+      ignore = true;
+    };
+  }, [categoryFilter]);
 
   function openNewForm() {
     setEditingId(null);

@@ -3,29 +3,7 @@ import { MockAiProvider } from "@/lib/ai/mock";
 import { buildSystemPrompt } from "@/lib/ai/prompts";
 import type { ChatMessage } from "@/lib/ai/provider";
 import type { AiAnalysisResult } from "@/lib/types";
-
-const VALID_SUGGESTED_ACTIONS = [
-  "continue_collect",
-  "collect_summary",
-  "quote_remind",
-  "human_follow_up",
-  "close_conversation",
-  "escalate",
-];
-
-const VALID_INTENTS = [
-  "inquiry_service",
-  "inquiry_price",
-  "inquiry_process",
-  "inquiry_timeline",
-  "submit_requirement",
-  "follow_up",
-  "complaint",
-  "casual_chat",
-  "other",
-];
-
-const VALID_INTENT_LEVELS = ["high", "medium", "low", "unknown"];
+import { SUGGESTED_ACTIONS, AI_INTENTS, VALID_INTENT_LEVELS } from "@/lib/types";
 
 function parseAiResponse(rawContent: string): { reply: string; analysis: AiAnalysisResult } {
   const separator = "---ANALYSIS---";
@@ -48,11 +26,11 @@ function parseAiResponse(rawContent: string): { reply: string; analysis: AiAnaly
     try {
       const parsed = JSON.parse(parts[1].trim());
       analysis = {
-        intent: VALID_INTENTS.includes(parsed.intent) ? parsed.intent : "other",
+        intent: AI_INTENTS.includes(parsed.intent) ? parsed.intent : "other",
         intent_level: VALID_INTENT_LEVELS.includes(parsed.intent_level) ? parsed.intent_level : "unknown",
         is_effective_lead: Boolean(parsed.is_effective_lead),
         need_human: Boolean(parsed.need_human),
-        suggested_action: VALID_SUGGESTED_ACTIONS.includes(parsed.suggested_action)
+        suggested_action: SUGGESTED_ACTIONS.includes(parsed.suggested_action)
           ? parsed.suggested_action
           : "continue_collect",
         summary: typeof parsed.summary === "string" ? parsed.summary : null,

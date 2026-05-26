@@ -81,11 +81,37 @@ export type Status = (typeof STATUSES)[number]["value"];
 export type IntentLevel = (typeof INTENT_LEVELS)[number]["value"];
 export type KnowledgeCategory = (typeof KNOWLEDGE_CATEGORIES)[number]["value"];
 export type SenderType = "customer" | "ai" | "human";
-export type ChangedBy = "ai" | "human";
+
+// ============================================
+// 预计算验证数组（用于 API/Service 层校验）
+// ============================================
+
+export const VALID_STATUSES: string[] = STATUSES.map((s) => s.value);
+export const VALID_INTENT_LEVELS: string[] = INTENT_LEVELS.map((i) => i.value);
+export const VALID_SOURCES: string[] = SOURCES.map((s) => s.value);
+export const VALID_CONTACT_TYPES: string[] = CONTACT_TYPES.map((c) => c.value);
+export const VALID_KNOWLEDGE_CATEGORIES: string[] = KNOWLEDGE_CATEGORIES.map((c) => c.value);
+export const VALID_SENDER_TYPES: string[] = ["customer", "ai", "human"];
 
 // ============================================
 // API 请求/响应类型
 // ============================================
+
+export interface Customer {
+  id: number;
+  nickname: string;
+  contactInfo: string | null;
+  contactType: string;
+  source: string;
+  status: string;
+  intentLevel: string;
+  nextFollowAt: string | null;
+  lastContactAt: string | null;
+  notes: string | null;
+  aiSummary: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface CreateCustomerInput {
   nickname: string;
@@ -105,16 +131,6 @@ export interface UpdateCustomerInput {
   nextFollowAt?: string | null;
   notes?: string;
   remark?: string;
-}
-
-export interface StatusChangeInput {
-  toStatus: Status;
-  remark?: string;
-}
-
-export interface CreateConversationInput {
-  senderType: SenderType;
-  messageContent: string;
 }
 
 export interface CreateKnowledgeInput {
@@ -201,12 +217,3 @@ export interface AiAnalysisResult {
   risk_flags: string[];
 }
 
-export interface AiChatInput {
-  customer_id: number;
-  message: string;
-}
-
-export interface AiChatResponse {
-  reply: string;
-  analysis: AiAnalysisResult;
-}

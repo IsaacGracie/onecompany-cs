@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/db";
-import type { CustomerQueryParams, CreateCustomerInput, UpdateCustomerInput, Status } from "@/lib/types";
-import { STATUSES, isValidTransition, getNextStatuses } from "@/lib/types";
-
-const VALID_STATUSES = STATUSES.map((s) => s.value);
+import type { CustomerQueryParams, CreateCustomerInput, UpdateCustomerInput } from "@/lib/types";
+import { STATUSES, VALID_STATUSES, isValidTransition, getNextStatuses } from "@/lib/types";
 
 export async function getCustomers(params: CustomerQueryParams) {
   const { page = 1, pageSize = 10, status, intentLevel, source, keyword } = params;
