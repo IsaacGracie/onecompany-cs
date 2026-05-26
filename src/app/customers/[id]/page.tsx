@@ -27,6 +27,7 @@ import type {
   Source,
   ContactType,
 } from "@/lib/types";
+import { getStatusBadgeVariant, getLabelFromValue, formatDate } from "@/lib/utils";
 
 interface Customer {
   id: number;
@@ -59,13 +60,6 @@ interface Conversation {
   senderType: string;
   messageContent: string;
   createdAt: string;
-}
-
-function getLabelFromValue(
-  items: readonly { value: string; label: string }[],
-  value: string
-) {
-  return items.find((i) => i.value === value)?.label || value;
 }
 
 // AI 分析字段中文映射
@@ -109,28 +103,6 @@ const AI_MISSING_INFO_LABELS: Record<string, string> = {
 
 function getAiLabel(map: Record<string, string>, value: string): string {
   return map[value] || value;
-}
-
-function formatDate(dateStr: string | null) {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-function getStatusBadgeVariant(status: string) {
-  const map: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-    new: "default",
-    serving: "default",
-    need_confirm: "outline",
-    quoted: "outline",
-    won: "secondary",
-    delivering: "secondary",
-    delivered: "secondary",
-    after_sales: "outline",
-    completed: "secondary",
-    lost: "destructive",
-  };
-  return map[status] || "default";
 }
 
 export default function CustomerDetailPage() {
@@ -222,10 +194,66 @@ export default function CustomerDetailPage() {
   }, [customerId]);
 
   useEffect(() => {
-    fetchCustomer();
-    fetchStatusLogs();
-    fetchConversations();
-  }, [fetchCustomer, fetchStatusLogs, fetchConversations]);
+    let ignore = false;
+
+    async function loadCustomer() {
+      try {
+        const res = await fetch(`/api/customers/${customerId}`);
+        if (!res.ok) {
+          if (!ignore) setError("客户不存在");
+          return;
+        }
+        const data = await res.json();
+        if (ignore) return;
+        setCustomer(data);
+        setEditForm({
+          nickname: data.nickname,
+          contactInfo: data.contactInfo || "",
+          contactType: data.contactType,
+          source: data.source,
+          intentLevel: data.intentLevel,
+          nextFollowAt: data.nextFollowAt ? data.nextFollowAt.slice(0, 16) : "",
+          notes: data.notes || "",
+        });
+      } catch {
+        if (!ignore) setError("加载失败");
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    async function loadStatusLogs() {
+      try {
+        const res = await fetch(`/api/customers/${customerId}/status`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!ignore) setStatusLogs(data);
+        }
+      } catch {
+        // Status logs are non-blocking for the detail page.
+      }
+    }
+
+    async function loadConversations() {
+      try {
+        const res = await fetch(`/api/customers/${customerId}/chats`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!ignore) setConversations(data);
+        }
+      } catch {
+        // Conversations are non-blocking for the detail page.
+      }
+    }
+
+    void loadCustomer();
+    void loadStatusLogs();
+    void loadConversations();
+
+    return () => {
+      ignore = true;
+    };
+  }, [customerId]);
 
   async function handleSaveInfo() {
     setSaving(true);
@@ -810,7 +838,7 @@ export default function CustomerDetailPage() {
                             : "人工"}
                         </Badge>
                         <span className="text-[11px] opacity-60">
-                          {formatDate(msg.createdAt)}
+                          {formatDate(msg.createdAt, true)}
                         </span>
                       </div>
                       <div className="whitespace-pre-wrap">{msg.messageContent}</div>
@@ -867,7 +895,7 @@ export default function CustomerDetailPage() {
                   className="flex items-start gap-3 text-sm"
                 >
                   <span className="text-muted-foreground whitespace-nowrap">
-                    {formatDate(log.createdAt)}
+                    {formatDate(log.createdAt, true)}
                   </span>
                   <div>
                     {log.fromStatus ? (

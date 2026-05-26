@@ -1,7 +1,5 @@
 import { prisma } from "@/lib/db";
-import { KNOWLEDGE_CATEGORIES } from "@/lib/types";
-
-const validCategories: string[] = KNOWLEDGE_CATEGORIES.map((c) => c.value);
+import { VALID_KNOWLEDGE_CATEGORIES } from "@/lib/types";
 
 interface KnowledgeQueryParams {
   category?: string;
@@ -30,7 +28,7 @@ export async function createKnowledge(data: {
   content: string;
   sortOrder?: number;
 }) {
-  if (!validCategories.includes(data.category)) {
+  if (!VALID_KNOWLEDGE_CATEGORIES.includes(data.category)) {
     throw new Error(`Invalid category: ${data.category}`);
   }
 
@@ -68,7 +66,7 @@ export async function updateKnowledge(
   const updateData: Record<string, unknown> = {};
 
   if (data.category !== undefined) {
-    if (!validCategories.includes(data.category)) {
+    if (!VALID_KNOWLEDGE_CATEGORIES.includes(data.category)) {
       throw new Error(`Invalid category: ${data.category}`);
     }
     updateData.category = data.category;

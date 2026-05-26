@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db";
-
-const VALID_SENDER_TYPES = ["customer", "ai", "human"];
+import { VALID_SENDER_TYPES } from "@/lib/types";
 
 export async function getConversations(customerId: number) {
   return prisma.conversation.findMany({

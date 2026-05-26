@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { STATUSES } from "@/lib/types";
+import { getStatusBadgeVariant, getLabelFromValue, formatDateShort } from "@/lib/utils";
 
 interface DashboardCustomer {
   id: number;
@@ -29,28 +30,6 @@ interface DashboardData {
 
 function getStatusLabel(status: string): string {
   return STATUSES.find((s) => s.value === status)?.label || status;
-}
-
-function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
-  const map: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-    new: "default",
-    serving: "default",
-    need_confirm: "outline",
-    quoted: "outline",
-    won: "secondary",
-    delivering: "secondary",
-    delivered: "secondary",
-    after_sales: "outline",
-    completed: "secondary",
-    lost: "destructive",
-  };
-  return map[status] || "default";
-}
-
-function formatDateShort(dateStr: string | null | undefined): string {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
 function daysAgo(dateStr: string | null | undefined): number {
@@ -102,7 +81,7 @@ function ReminderCard({
       <div className="mb-1.5 font-medium text-sm">{customer.nickname}</div>
       {/* 第二行：状态 Badge + 提醒类型 */}
       <div className="mb-1.5 flex items-center gap-2">
-        <Badge variant={getStatusVariant(customer.status)} className="text-[10px] px-1.5 py-0">
+        <Badge variant={getStatusBadgeVariant(customer.status)} className="text-[10px] px-1.5 py-0">
           {getStatusLabel(customer.status)}
         </Badge>
         <span className="text-xs text-muted-foreground">{reminderType}</span>

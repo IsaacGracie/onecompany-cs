@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { STATUSES, INTENT_LEVELS, SOURCES } from "@/lib/types";
-import type { Status, IntentLevel, Source } from "@/lib/types";
+import { getStatusBadgeVariant, getLabelFromValue, formatDate } from "@/lib/utils";
 
 interface Customer {
   id: number;
@@ -36,35 +36,6 @@ interface CustomerListResponse {
   page: number;
   pageSize: number;
   totalPages: number;
-}
-
-function getStatusBadgeVariant(status: string) {
-  const map: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-    new: "default",
-    serving: "default",
-    need_confirm: "outline",
-    quoted: "outline",
-    won: "secondary",
-    delivering: "secondary",
-    delivered: "secondary",
-    after_sales: "outline",
-    completed: "secondary",
-    lost: "destructive",
-  };
-  return map[status] || "default";
-}
-
-function getLabelFromValue(
-  items: readonly { value: string; label: string }[],
-  value: string
-) {
-  return items.find((i) => i.value === value)?.label || value;
-}
-
-function formatDate(dateStr: string | null) {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function CustomersPage() {
@@ -102,8 +73,41 @@ export default function CustomersPage() {
   }, [page, keyword, statusFilter, intentFilter, sourceFilter]);
 
   useEffect(() => {
-    fetchCustomers();
-  }, [fetchCustomers]);
+    let ignore = false;
+
+    async function loadCustomers() {
+      await Promise.resolve();
+      if (ignore) return;
+
+      setLoading(true);
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("pageSize", "10");
+      if (keyword) params.set("keyword", keyword);
+      if (statusFilter) params.set("status", statusFilter);
+      if (intentFilter) params.set("intentLevel", intentFilter);
+      if (sourceFilter) params.set("source", sourceFilter);
+
+      try {
+        const res = await fetch(`/api/customers?${params.toString()}`);
+        const data: CustomerListResponse = await res.json();
+        if (ignore) return;
+        setCustomers(data.data);
+        setTotal(data.total);
+        setTotalPages(data.totalPages);
+      } catch (err) {
+        console.error("Failed to fetch customers:", err);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    void loadCustomers();
+
+    return () => {
+      ignore = true;
+    };
+  }, [page, keyword, statusFilter, intentFilter, sourceFilter]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();

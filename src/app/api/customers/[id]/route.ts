@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerById, updateCustomer, deleteCustomer } from "@/lib/services/customer.service";
 import type { UpdateCustomerInput } from "@/lib/types";
-import { STATUSES, INTENT_LEVELS, SOURCES, CONTACT_TYPES } from "@/lib/types";
-
-const validStatuses = STATUSES.map((s) => s.value);
-const validIntentLevels = INTENT_LEVELS.map((i) => i.value);
-const validSources = SOURCES.map((s) => s.value);
-const validContactTypes = CONTACT_TYPES.map((c) => c.value);
+import { VALID_STATUSES, VALID_INTENT_LEVELS, VALID_SOURCES, VALID_CONTACT_TYPES } from "@/lib/types";
 
 function parseId(params: { id: string }): number | null {
   const id = Number(params.id);
@@ -58,28 +53,28 @@ export async function PUT(
     if (body.nextFollowAt !== undefined) input.nextFollowAt = body.nextFollowAt;
 
     if (body.contactType !== undefined) {
-      if (!validContactTypes.includes(body.contactType)) {
+      if (!VALID_CONTACT_TYPES.includes(body.contactType)) {
         return NextResponse.json({ error: `Invalid contactType: ${body.contactType}` }, { status: 400 });
       }
       input.contactType = body.contactType;
     }
 
     if (body.source !== undefined) {
-      if (!validSources.includes(body.source)) {
+      if (!VALID_SOURCES.includes(body.source)) {
         return NextResponse.json({ error: `Invalid source: ${body.source}` }, { status: 400 });
       }
       input.source = body.source;
     }
 
     if (body.status !== undefined) {
-      if (!validStatuses.includes(body.status)) {
+      if (!VALID_STATUSES.includes(body.status)) {
         return NextResponse.json({ error: `Invalid status: ${body.status}` }, { status: 400 });
       }
       input.status = body.status;
     }
 
     if (body.intentLevel !== undefined) {
-      if (!validIntentLevels.includes(body.intentLevel)) {
+      if (!VALID_INTENT_LEVELS.includes(body.intentLevel)) {
         return NextResponse.json({ error: `Invalid intentLevel: ${body.intentLevel}` }, { status: 400 });
       }
       input.intentLevel = body.intentLevel;
