@@ -1,4 +1,4 @@
-import type { LLMProvider, ChatMessage, ChatOptions, ChatResponse } from "./provider";
+import type { LLMProvider, ChatMessage, ChatResponse } from "./provider";
 
 /** 从用户消息中检测已提供的信息 */
 function detectProvidedInfo(userContent: string): {
@@ -92,7 +92,7 @@ interface DetectedInfo {
   timeline: string | null;
 }
 
-function buildReply(info: DetectedInfo, userContent: string): string {
+function buildReply(info: DetectedInfo): string {
   const missing: string[] = [];
   if (!info.project_type) missing.push("项目类型");
   if (!info.key_features) missing.push("关键功能");
@@ -183,7 +183,7 @@ const presetReplies = [
 ];
 
 export class MockAiProvider implements LLMProvider {
-  async chat(messages: ChatMessage[], _options?: ChatOptions): Promise<ChatResponse> {
+  async chat(messages: ChatMessage[]): Promise<ChatResponse> {
     const lastUserMessage = messages.filter((m) => m.role === "user").pop();
     const userContent = lastUserMessage?.content || "";
 
@@ -242,7 +242,7 @@ export class MockAiProvider implements LLMProvider {
     // 构建回复
     let reply: string;
     if (isComplete) {
-      reply = buildReply(info, userContent);
+      reply = buildReply(info);
     } else if (/价格|多少钱|报价|费用/.test(userContent)) {
       // 客户问价但信息不全
       const infoLines: string[] = [];
@@ -272,7 +272,7 @@ export class MockAiProvider implements LLMProvider {
         "了解这些后我可以帮您整理需求，老板会给您准确报价。",
       ].join("\n");
     } else {
-      reply = buildReply(info, userContent);
+      reply = buildReply(info);
     }
 
     // 生成摘要

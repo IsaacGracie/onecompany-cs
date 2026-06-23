@@ -1,88 +1,28 @@
 import { prisma } from "@/lib/db";
-import { MockAiProvider } from "@/lib/ai/mock";
+import { getLLMProvider, getLLMProviderMode } from "@/lib/ai/factory";
 import { buildSystemPrompt } from "@/lib/ai/prompts";
+import { parseAIResponse } from "@/lib/ai/response";
+import { retrieveKnowledgeContext } from "@/lib/services/knowledge.service";
 import type { ChatMessage } from "@/lib/ai/provider";
+import type { LLMProviderMode } from "@/lib/ai/factory";
 import type { AiAnalysisResult } from "@/lib/types";
-import { SUGGESTED_ACTIONS, AI_INTENTS, VALID_INTENT_LEVELS } from "@/lib/types";
 
-function parseAiResponse(rawContent: string): { reply: string; analysis: AiAnalysisResult } {
-  const separator = "---ANALYSIS---";
-  const parts = rawContent.split(separator);
-
-  const reply = parts[0]?.trim() || rawContent;
-
-  let analysis: AiAnalysisResult = {
-    intent: "other",
-    intent_level: "unknown",
-    is_effective_lead: false,
-    need_human: false,
-    suggested_action: "continue_collect",
-    summary: null,
-    missing_info: [],
-    risk_flags: [],
-  };
-
-  if (parts.length > 1) {
-    try {
-      const parsed = JSON.parse(parts[1].trim());
-      analysis = {
-        intent: AI_INTENTS.includes(parsed.intent) ? parsed.intent : "other",
-        intent_level: VALID_INTENT_LEVELS.includes(parsed.intent_level) ? parsed.intent_level : "unknown",
-        is_effective_lead: Boolean(parsed.is_effective_lead),
-        need_human: Boolean(parsed.need_human),
-        suggested_action: SUGGESTED_ACTIONS.includes(parsed.suggested_action)
-          ? parsed.suggested_action
-          : "continue_collect",
-        summary: typeof parsed.summary === "string" ? parsed.summary : null,
-        missing_info: Array.isArray(parsed.missing_info) ? parsed.missing_info : [],
-        risk_flags: Array.isArray(parsed.risk_flags) ? parsed.risk_flags : [],
-      };
-    } catch {
-      // 解析失败使用默认值
-    }
-  }
-
-  return { reply, analysis };
-}
-
-export async function getActiveKnowledgeContext(): Promise<string> {
-  const items = await prisma.knowledgeBase.findMany({
-    where: { isActive: true },
-    orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
-  });
-
-  if (items.length === 0) return "";
-
-  const grouped: Record<string, string[]> = {};
-  for (const item of items) {
-    if (!grouped[item.category]) grouped[item.category] = [];
-    grouped[item.category].push(`- ${item.title}：${item.content}`);
-  }
-
-  const categoryLabels: Record<string, string> = {
-    service: "服务范围",
-    price: "价格区间",
-    process: "合作流程",
-    faq: "常见问题",
-    case: "案例说明",
-  };
-
-  return Object.entries(grouped)
-    .map(([cat, entries]) => `【${categoryLabels[cat] || cat}】\n${entries.join("\n")}`)
-    .join("\n\n");
-}
-
-export async function getConversationHistory(customerId: number): Promise<ChatMessage[]> {
+export async function getConversationHistory(
+  customerId: number,
+  limit = 20
+): Promise<ChatMessage[]> {
   const conversations = await prisma.conversation.findMany({
     where: { customerId },
-    orderBy: { createdAt: "asc" },
-    take: 20,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit,
   });
 
-  return conversations.map((c) => ({
-    role: (c.senderType === "customer" ? "user" : "assistant") as "user" | "assistant",
-    content: c.messageContent,
-  }));
+  return conversations
+    .reverse()
+    .map((conversation) => ({
+      role: conversation.senderType === "customer" ? "user" : "assistant",
+      content: conversation.messageContent,
+    }));
 }
 
 export interface AiChatResult {
@@ -96,11 +36,16 @@ export interface AiChatResult {
 
 export async function handleAiChat(
   customerId: number,
-  customerMessageContent: string
+  customerMessageContent: string,
+  providerMode?: LLMProviderMode
 ): Promise<AiChatResult> {
   // 1. 获取客户信息
   const customer = await prisma.customer.findUnique({ where: { id: customerId } });
   if (!customer) throw new Error("Customer not found");
+
+  // 在写入客户消息前验证所选 Provider 配置。
+  const effectiveProviderMode = providerMode ?? getLLMProviderMode();
+  const provider = getLLMProvider(effectiveProviderMode);
 
   // 2. 保存客户消息
   const customerMsg = await prisma.conversation.create({
@@ -111,23 +56,37 @@ export async function handleAiChat(
     },
   });
 
-  // 3. 构造 Prompt
+  // 3. 真实 Provider 使用知识库和历史；Mock 仅接收当前消息。
   const ownerName = process.env.APP_OWNER_NAME || "我的工作室";
-  const knowledgeContext = await getActiveKnowledgeContext();
+  const usesModelContext = effectiveProviderMode === "openai-compatible";
+  const knowledgeContext = usesModelContext
+    ? await retrieveKnowledgeContext(customerMessageContent, 3)
+    : "";
   const systemPrompt = buildSystemPrompt(ownerName, knowledgeContext);
-  const history = await getConversationHistory(customerId);
+  const history = usesModelContext
+    ? await getConversationHistory(customerId)
+    : [{ role: "user" as const, content: customerMessageContent.trim() }];
+  const customerContext = [
+    `客户昵称：${customer.nickname}`,
+    `当前状态：${customer.status}`,
+    `当前意向等级：${customer.intentLevel}`,
+    customer.notes ? `人工备注：${customer.notes}` : null,
+    customer.aiSummary ? `已有 AI 摘要：${customer.aiSummary}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
+    { role: "system", content: `## 当前客户信息\n${customerContext}` },
     ...history,
   ];
 
-  // 4. 调用 Mock AI
-  const provider = new MockAiProvider();
+  // 4. 根据环境变量选择 Mock 或 OpenAI-compatible Provider
   const aiResponse = await provider.chat(messages);
 
   // 5. 解析 AI 响应
-  const { reply, analysis } = parseAiResponse(aiResponse.content);
+  const { reply, analysis } = parseAIResponse(aiResponse.content);
 
   // 6. 保存 AI 回复
   const aiMsg = await prisma.conversation.create({
@@ -146,11 +105,18 @@ export async function handleAiChat(
   let statusChanged: { from: string; to: string } | null = null;
   let suggestConfirm = false;
 
-  // 如果 suggested_action = collect_summary 且有摘要，更新 aiSummary
-  if (analysis.suggested_action === "collect_summary" && analysis.summary) {
-    updateData.aiSummary = analysis.summary;
-    suggestConfirm = true;
+  if (analysis.intent_level !== "unknown") {
+    updateData.intentLevel = analysis.intent_level;
   }
+
+  if (analysis.summary) {
+    updateData.aiSummary = analysis.summary;
+  }
+
+  suggestConfirm =
+    analysis.suggested_action === "collect_summary" ||
+    analysis.suggested_action === "human_follow_up" ||
+    analysis.need_human;
 
   // 如果客户状态是 new，AI 首次回复后自动转为 serving
   if (customer.status === "new") {

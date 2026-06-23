@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,14 +21,6 @@ import {
   CONTACT_TYPES,
   getNextStatuses,
 } from "@/lib/types";
-import type {
-  Status,
-  IntentLevel,
-  Source,
-  ContactType,
-} from "@/lib/types";
-import { getStatusBadgeVariant, getLabelFromValue, formatDate } from "@/lib/utils";
-
 interface Customer {
   id: number;
   nickname: string;
@@ -60,6 +52,13 @@ interface Conversation {
   senderType: string;
   messageContent: string;
   createdAt: string;
+}
+
+function getLabelFromValue(
+  items: readonly { value: string; label: string }[],
+  value: string
+) {
+  return items.find((i) => i.value === value)?.label || value;
 }
 
 // AI 分析字段中文映射
@@ -105,6 +104,28 @@ function getAiLabel(map: Record<string, string>, value: string): string {
   return map[value] || value;
 }
 
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function getStatusBadgeVariant(status: string) {
+  const map: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+    new: "default",
+    serving: "default",
+    need_confirm: "outline",
+    quoted: "outline",
+    won: "secondary",
+    delivering: "secondary",
+    delivered: "secondary",
+    after_sales: "outline",
+    completed: "secondary",
+    lost: "destructive",
+  };
+  return map[status] || "default";
+}
+
 export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -125,6 +146,9 @@ export default function CustomerDetailPage() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [providerMode, setProviderMode] = useState<"mock" | "openai-compatible">("mock");
+  const [providerModel, setProviderModel] = useState("");
+  const providerModeInitialized = useRef(false);
   const [aiResult, setAiResult] = useState<{
     reply: string;
     analysis: Record<string, unknown>;
@@ -151,6 +175,13 @@ export default function CustomerDetailPage() {
       }
       const data = await res.json();
       setCustomer(data);
+      if (!providerModeInitialized.current) {
+        setProviderMode(data.providerMode === "openai-compatible" ? "openai-compatible" : "mock");
+        setProviderModel(
+          typeof data.providerModel === "string" ? data.providerModel : ""
+        );
+        providerModeInitialized.current = true;
+      }
       setEditForm({
         nickname: data.nickname,
         contactInfo: data.contactInfo || "",
@@ -193,67 +224,13 @@ export default function CustomerDetailPage() {
     }
   }, [customerId]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- These callbacks synchronize page state with API responses. */
   useEffect(() => {
-    let ignore = false;
-
-    async function loadCustomer() {
-      try {
-        const res = await fetch(`/api/customers/${customerId}`);
-        if (!res.ok) {
-          if (!ignore) setError("客户不存在");
-          return;
-        }
-        const data = await res.json();
-        if (ignore) return;
-        setCustomer(data);
-        setEditForm({
-          nickname: data.nickname,
-          contactInfo: data.contactInfo || "",
-          contactType: data.contactType,
-          source: data.source,
-          intentLevel: data.intentLevel,
-          nextFollowAt: data.nextFollowAt ? data.nextFollowAt.slice(0, 16) : "",
-          notes: data.notes || "",
-        });
-      } catch {
-        if (!ignore) setError("加载失败");
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    }
-
-    async function loadStatusLogs() {
-      try {
-        const res = await fetch(`/api/customers/${customerId}/status`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!ignore) setStatusLogs(data);
-        }
-      } catch {
-        // Status logs are non-blocking for the detail page.
-      }
-    }
-
-    async function loadConversations() {
-      try {
-        const res = await fetch(`/api/customers/${customerId}/chats`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!ignore) setConversations(data);
-        }
-      } catch {
-        // Conversations are non-blocking for the detail page.
-      }
-    }
-
-    void loadCustomer();
-    void loadStatusLogs();
-    void loadConversations();
-
-    return () => {
-      ignore = true;
-    };
-  }, [customerId]);
+    fetchCustomer();
+    fetchStatusLogs();
+    fetchConversations();
+  }, [fetchCustomer, fetchStatusLogs, fetchConversations]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSaveInfo() {
     setSaving(true);
@@ -360,7 +337,10 @@ export default function CustomerDetailPage() {
       const res = await fetch(`/api/customers/${customerId}/ai-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: aiInput.trim() }),
+        body: JSON.stringify({
+          message: aiInput.trim(),
+          providerMode,
+        }),
       });
 
       if (!res.ok) {
@@ -705,20 +685,61 @@ export default function CustomerDetailPage() {
       {/* AI 接待 */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>AI 接待</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            AI 接待
+            <Badge variant="outline" className="text-xs font-normal">
+              {providerMode === "openai-compatible"
+                ? providerModel || "未配置"
+                : "Mock 规则演示"}
+            </Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleAiChat} className="mb-4 flex gap-3">
-            <Input
-              placeholder="输入客户消息，点击 AI 接待..."
-              value={aiInput}
-              onChange={(e) => setAiInput(e.target.value)}
-              className="flex-1"
-              disabled={aiLoading}
-            />
-            <Button type="submit" disabled={aiLoading || !aiInput.trim()}>
-              {aiLoading ? "处理中..." : "AI 接待"}
-            </Button>
+          <form onSubmit={handleAiChat} className="mb-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <Label htmlFor="provider-mode" className="shrink-0">
+                本次使用
+              </Label>
+              <Select
+                value={providerMode}
+                onValueChange={(value) =>
+                  value &&
+                  setProviderMode(value as "mock" | "openai-compatible")
+                }
+                disabled={aiLoading}
+              >
+                <SelectTrigger id="provider-mode" className="w-48">
+                  <SelectValue>
+                    {providerMode === "openai-compatible"
+                      ? providerModel || "未配置"
+                      : "Mock 规则演示"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai-compatible">
+                    {providerModel || "未配置"}
+                  </SelectItem>
+                  <SelectItem value="mock">Mock 规则演示</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">
+                {providerMode === "mock"
+                  ? "仅分析本次输入，不使用历史对话或知识库"
+                  : "使用最近对话与知识库检索上下文"}
+              </span>
+            </div>
+            <div className="flex gap-3">
+              <Input
+                placeholder="输入客户消息，点击 AI 接待..."
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                className="flex-1"
+                disabled={aiLoading}
+              />
+              <Button type="submit" disabled={aiLoading || !aiInput.trim()}>
+                {aiLoading ? "处理中..." : "AI 接待"}
+              </Button>
+            </div>
           </form>
 
           {aiResult && (
@@ -773,6 +794,22 @@ export default function CustomerDetailPage() {
                   <div>
                     <span className="text-muted-foreground">建议动作：</span>
                     <span>{getAiLabel(AI_ACTION_LABELS, String(aiResult.analysis.suggested_action))}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">项目类型：</span>
+                    <span>{typeof aiResult.analysis.project_type === "string" && aiResult.analysis.project_type ? aiResult.analysis.project_type : "未识别"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">预算：</span>
+                    <span>{typeof aiResult.analysis.budget_range === "string" && aiResult.analysis.budget_range ? aiResult.analysis.budget_range : "未识别"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">期望时间：</span>
+                    <span>{typeof aiResult.analysis.timeline === "string" && aiResult.analysis.timeline ? aiResult.analysis.timeline : "未识别"}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">已确认需求：</span>
+                    <span>{Array.isArray(aiResult.analysis.requirements) && (aiResult.analysis.requirements as string[]).length > 0 ? (aiResult.analysis.requirements as string[]).join("、") : "暂无"}</span>
                   </div>
                   {typeof aiResult.analysis.summary === "string" && aiResult.analysis.summary && (
                     <div className="col-span-2">
@@ -838,7 +875,7 @@ export default function CustomerDetailPage() {
                             : "人工"}
                         </Badge>
                         <span className="text-[11px] opacity-60">
-                          {formatDate(msg.createdAt, true)}
+                          {formatDate(msg.createdAt)}
                         </span>
                       </div>
                       <div className="whitespace-pre-wrap">{msg.messageContent}</div>
@@ -895,7 +932,7 @@ export default function CustomerDetailPage() {
                   className="flex items-start gap-3 text-sm"
                 >
                   <span className="text-muted-foreground whitespace-nowrap">
-                    {formatDate(log.createdAt, true)}
+                    {formatDate(log.createdAt)}
                   </span>
                   <div>
                     {log.fromStatus ? (

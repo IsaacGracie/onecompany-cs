@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerById, updateCustomer, deleteCustomer } from "@/lib/services/customer.service";
+import { getLLMModelName, getLLMProviderMode } from "@/lib/ai/factory";
 import type { UpdateCustomerInput } from "@/lib/types";
 import { VALID_STATUSES, VALID_INTENT_LEVELS, VALID_SOURCES, VALID_CONTACT_TYPES } from "@/lib/types";
 
@@ -24,7 +25,11 @@ export async function GET(
     return NextResponse.json({ error: "Customer not found" }, { status: 404 });
   }
 
-  return NextResponse.json(customer);
+  return NextResponse.json({
+    ...customer,
+    providerMode: getLLMProviderMode(),
+    providerModel: getLLMModelName(),
+  });
 }
 
 export async function PUT(

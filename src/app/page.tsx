@@ -21,10 +21,10 @@ interface DashboardData {
   stats: Record<string, number>;
   todayFollowUps: DashboardCustomer[];
   overdueFollowUps: DashboardCustomer[];
-  aiNeedConfirm: DashboardCustomer[];
-  quotedOverdue: DashboardCustomer[];
-  wonNotDelivering: DashboardCustomer[];
-  deliveredNeedAfterSales: DashboardCustomer[];
+  aiSummaryCustomers: DashboardCustomer[];
+  quotedStale: DashboardCustomer[];
+  wonStale: DashboardCustomer[];
+  deliveredStale: DashboardCustomer[];
   afterSalesCustomers: DashboardCustomer[];
 }
 
@@ -205,9 +205,9 @@ export default function Home() {
   const s = data.stats;
   const urgentCount =
     data.overdueFollowUps.length +
-    data.quotedOverdue.length +
-    data.wonNotDelivering.length +
-    data.deliveredNeedAfterSales.length;
+    data.quotedStale.length +
+    data.wonStale.length +
+    data.deliveredStale.length;
 
   const goCustomers = () => router.push("/customers");
 
@@ -215,7 +215,7 @@ export default function Home() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="mb-1 text-2xl font-bold">客服看板</h1>
       <p className="mb-6 text-sm text-muted-foreground">
-        优先处理逾期未跟进、AI 建议需求确认和已报价未回复客户。
+        优先处理逾期未跟进、待人工确认信息和较长时间未更新的客户。
       </p>
 
       {/* 统计概览 */}
@@ -233,7 +233,7 @@ export default function Home() {
       {/* 紧急提醒横幅 */}
       {urgentCount > 0 && (
         <div className="mb-6 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium">
-          有 {urgentCount} 项需要立即处理的事项
+          有 {urgentCount} 项已逾期或较长时间未更新
         </div>
       )}
 
@@ -273,16 +273,16 @@ export default function Home() {
         </SectionCard>
 
         <SectionCard
-          title="AI 建议需求确认"
-          count={data.aiNeedConfirm.length}
-          emptyText="暂无 AI 建议确认的客户"
+          title="待人工确认信息"
+          count={data.aiSummaryCustomers.length}
+          emptyText="暂无需要人工确认的 AI 摘要"
         >
-          {data.aiNeedConfirm.map((c) => (
+          {data.aiSummaryCustomers.map((c) => (
             <ReminderCard
               key={c.id}
               customer={c}
               router={router}
-              reminderType="AI 建议需求确认"
+              reminderType="已有 AI 分析摘要"
               description={summarizeAiSummary(c.aiSummary) || undefined}
             />
           ))}
@@ -292,48 +292,48 @@ export default function Home() {
       {/* 第二屏：阶段提醒 */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         <SectionCard
-          title="已报价待跟进"
-          count={data.quotedOverdue.length}
-          emptyText="暂无报价超期客户"
+          title="已报价 · 最近未更新"
+          count={data.quotedStale.length}
+          emptyText="暂无较长时间未更新的已报价客户"
           accent="text-orange-600"
         >
-          {data.quotedOverdue.map((c) => (
+          {data.quotedStale.map((c) => (
             <ReminderCard
               key={c.id}
               customer={c}
               router={router}
-              reminderType={`报价后 ${daysAgo(c.updatedAt)} 天未跟进`}
+              reminderType={`最近更新于 ${daysAgo(c.updatedAt)} 天前`}
             />
           ))}
         </SectionCard>
 
         <SectionCard
-          title="已成交待交付"
-          count={data.wonNotDelivering.length}
-          emptyText="暂无待交付客户"
+          title="已成交 · 最近未更新"
+          count={data.wonStale.length}
+          emptyText="暂无较长时间未更新的已成交客户"
           accent="text-green-600"
         >
-          {data.wonNotDelivering.map((c) => (
+          {data.wonStale.map((c) => (
             <ReminderCard
               key={c.id}
               customer={c}
               router={router}
-              reminderType={`成交后 ${daysAgo(c.updatedAt)} 天未开始交付`}
+              reminderType={`最近更新于 ${daysAgo(c.updatedAt)} 天前`}
             />
           ))}
         </SectionCard>
 
         <SectionCard
-          title="已交付待确认售后"
-          count={data.deliveredNeedAfterSales.length}
-          emptyText="暂无待确认售后客户"
+          title="已交付 · 最近未更新"
+          count={data.deliveredStale.length}
+          emptyText="暂无较长时间未更新的已交付客户"
         >
-          {data.deliveredNeedAfterSales.map((c) => (
+          {data.deliveredStale.map((c) => (
             <ReminderCard
               key={c.id}
               customer={c}
               router={router}
-              reminderType={`已交付 ${daysAgo(c.updatedAt)} 天，建议确认售后`}
+              reminderType={`最近更新于 ${daysAgo(c.updatedAt)} 天前`}
             />
           ))}
         </SectionCard>
@@ -348,7 +348,7 @@ export default function Home() {
               key={c.id}
               customer={c}
               router={router}
-              reminderType={`售后进行中，已 ${daysAgo(c.updatedAt)} 天`}
+              reminderType={`最近更新于 ${daysAgo(c.updatedAt)} 天前`}
             />
           ))}
         </SectionCard>

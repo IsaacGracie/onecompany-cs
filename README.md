@@ -1,160 +1,158 @@
-# OneCompany CS — 一人公司客服系统
+# OneCompany CS
 
-为独立开发者 / 小型工作室设计的轻量级客户管理与 AI 接待系统。
+OneCompany CS 是一个面向独立开发者和小型工作室的本地客户线索管理 MVP。它把客户资料、状态流转、人工对话记录、知识库维护和可选的模型调用放在一个 Next.js 应用中，用于演示单用户工作流。
 
-> **当前版本**：本地 MVP（v0.1.0）。适合 clone 后直接运行，体验完整业务闭环。
+> [!WARNING]
+> 当前版本没有登录、鉴权、权限隔离、请求限流、生产数据库和备份方案。所有 API 都可直接访问和修改数据，因此项目只适合本地开发与演示，不应直接部署到公网。加入认证与生产安全措施之前，本项目不提供自动部署说明或部署按钮。
 
-## 项目定位
+## 项目状态
 
-一人公司客服系统不是一个通用 SaaS，而是为「一个人干活」的开发者/工作室设计的客户管理工具：
+- 状态：MVP / Demo
+- 使用场景：本地开发、代码审阅、单用户流程演示
+- 不属于：生产级 SaaS、可公开访问的客服系统、真实客户消息渠道
+- AI 接待入口位于后台客户详情页，由操作者手动提交客户消息；当前没有接入微信、邮件、网页聊天组件等外部渠道
 
-- 客户从哪里来、当前什么状态、下一步该做什么 — 一目了然
-- 客户来咨询时，AI 自动接待、识别意图、提取需求、标记风险
-- 知识库驱动回复，保证信息一致性
+## 已实现功能
 
-## 核心功能
+- 客户录入、编辑、搜索、筛选和删除
+- 受控的客户状态流转、状态日志和下次跟进时间
+- 客户、人工与 AI 三类对话记录
+- 知识库条目的增删改查、分类、排序和启用控制
+- Mock 与 OpenAI-compatible Provider 的页面选择
+- 真实 Provider 响应的结构化解析与保守 fallback
+- 基于 SQLite 知识库的关键词加权 topK 检索
+- 基于数据库条件的待跟进和阶段提醒看板
 
-### 客户管理
+看板中的“待人工确认信息”根据客户处于 `serving` 状态且已有 `aiSummary` 生成，不表示系统持久化了独立的 AI 建议。报价、成交和交付区块按客户最近更新时间筛选，并明确显示“最近更新于 X 天前”；它们不表示客户进入当前阶段的精确时长。
 
-- 客户 CRUD（创建、查看、编辑、删除）
-- 按状态、意向度、来源、关键词筛选，分页浏览
-- 10 阶段状态流转：`新线索 → 接待中 → 需求确认 → 已报价 → 已成交 → 交付中 → 已交付 → 售后中 → 已完结 / 已丢失`
-- 状态变更审计日志
+## Mock 与真实 Provider 的边界
 
-### AI 接待
+### Mock 模式
 
-- 基于知识库的自动回复与需求采集
-- 意图识别（9 种意图类型）与意向度评估
-- 自动提取项目类型、功能需求、预算、工期
-- 风险标记（低预算、紧急、意向不清）
-- 结构化 AI 摘要，辅助人工跟进
+```env
+LLM_PROVIDER=mock
+```
 
-### 知识库
+Mock 是一个本地规则模拟器，不调用大模型，也不代表真实模型能力。它仅分析当前最后一条客户消息，通过正则和固定规则生成演示回复及部分分析结果：
 
-- 5 大分类管理：服务范围、价格区间、合作流程、常见问题、案例说明
-- CRUD、启停用、排序
-- 预置 19 条种子数据
+- 不使用历史对话进行跨轮信息累计
+- 不读取或使用检索出的知识库上下文
+- 不验证真实模型的推理、理解或生成质量
+- 适合离线跑通消息保存、界面展示和保守状态流转
 
-### 控制面板
+因此，在 Mock 模式下修改知识库不会改变 Mock 的规则回复。
 
-- 各状态客户数量概览
-- 今日待跟进 / 逾期跟进提醒
-- 超时预警（报价未响应 7 天、成交未交付 3 天、交付未确认 7 天）
+### OpenAI-compatible 模式
+
+```env
+LLM_PROVIDER=openai-compatible
+LLM_API_URL=https://api.deepseek.com/chat/completions
+LLM_API_KEY=替换为本地密钥
+LLM_MODEL=deepseek-v4-flash
+LLM_TEMPERATURE=0.7
+LLM_MAX_TOKENS=2048
+```
+
+真实 Provider 会收到当前客户信息、最近最多 20 条对话，以及根据当前消息检索出的最多 3 条知识库上下文。模型被要求返回客户回复和结构化分析，但实际输出质量取决于所配置的外部模型，项目不能保证模型始终返回完整或正确的字段。
+
+页面会显示当前配置的模型标识，并允许为当前页面后续请求选择 Mock 或已配置的真实 Provider。显式选择真实 Provider 但缺少 URL、API key 或 model 时，请求会失败并提示检查服务端环境变量，不会伪装成真实调用成功。
+
+## 知识库检索边界
+
+当前检索实现是本地关键词匹配，不是语义 RAG：
+
+- 只读取启用条目
+- 对标题、分类和正文命中进行不同权重计分
+- 按得分、人工排序和 ID 排序后取 topK
+- 没有 embedding、向量数据库、重排模型或检索质量评估
+- 检索结果只会进入真实 OpenAI-compatible Provider 的 Prompt；Mock 会忽略这些上下文
+
+## Demo 数据声明
+
+`prisma/seed.ts` 中的知识库内容全部是虚构 Demo 数据，只用于本地界面和流程演示：
+
+- 不代表真实客户、真实项目、真实成交或已验证案例
+- 价格、周期、服务和案例描述不构成商业承诺
+- 执行 seed 会先清空现有 `knowledge_base` 表，再写入 Demo 条目
+
+不要对包含需要保留数据的数据库执行 `npm run seed`。
 
 ## 技术栈
 
-| 层面 | 技术 |
-|------|------|
-| 框架 | Next.js 16 (App Router) |
-| 语言 | TypeScript 5 |
-| UI | React 19 + Tailwind CSS 4 + shadcn/ui + Lucide Icons |
-| 数据库 | SQLite (Prisma 7 ORM) |
-| AI | 可插拔 `LLMProvider` 接口（当前为规则引擎 Mock） |
+- Next.js 16 App Router、React 19、TypeScript
+- Tailwind CSS 4、shadcn/base-ui 组件
+- Prisma 7、SQLite、better-sqlite3 adapter
+- OpenAI-compatible Chat Completions API
 
-## 本地启动
+## 本地运行
+
+仅在本地开发环境中运行：
 
 ```bash
-# 克隆仓库
-git clone https://github.com/<your-username>/onecompany-cs.git
-cd onecompany-cs
-
-# 安装依赖
 npm install
-
-# 配置环境变量
-cp .env.example .env
-# .env 中的默认值即可直接使用，无需修改
-
-# 初始化数据库
+copy .env.example .env
+npx prisma generate
 npx prisma db push
-
-# 填充种子数据（19 条知识库预设）
 npm run seed
-
-# 启动开发服务器
 npm run dev
 ```
 
-访问 [http://localhost:3000](http://localhost:3000) 即可使用。
+浏览器访问 [http://localhost:3000](http://localhost:3000)。macOS/Linux 可将复制命令替换为 `cp .env.example .env`。
+
+如果不需要预置 Demo 知识库，可以跳过 `npm run seed`，在页面中手动新增知识库条目。
+
+常用检查：
+
+```bash
+npm run lint
+npm run build
+```
 
 ## 环境变量
 
-项目通过 `.env` 文件配置环境变量（`.env.example` 已提供模板）：
+| 变量 | 说明 | 示例 |
+| --- | --- | --- |
+| `DATABASE_URL` | 本地 SQLite 数据库地址 | `file:./prisma/dev.db` |
+| `APP_OWNER_NAME` | AI Prompt 中的演示工作室名称 | `我的工作室` |
+| `LLM_PROVIDER` | 默认 Provider：`mock` 或 `openai-compatible` | `mock` |
+| `LLM_API_URL` | Chat Completions 完整地址 | `https://api.deepseek.com/chat/completions` |
+| `LLM_API_KEY` | 外部模型 API key，仅保存在本地 `.env` | － |
+| `LLM_MODEL` | 外部模型 API 标识 | `deepseek-v4-flash` |
+| `LLM_TEMPERATURE` | 默认温度 | `0.7` |
+| `LLM_MAX_TOKENS` | 默认最大输出 token | `2048` |
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `DATABASE_URL` | `file:./prisma/dev.db` | SQLite 数据库路径 |
-| `APP_OWNER_NAME` | `我的工作室` | 工作室名称，用于 AI 回复中的自称 |
-| `LLM_API_URL` | `https://api.openai.com/v1` | LLM API 地址（预留，当前 Mock 不使用） |
-| `LLM_API_KEY` | `sk-your-api-key-here` | LLM API Key（预留） |
-| `LLM_MODEL` | `gpt-3.5-turbo` | 模型名称（预留） |
+所有 `.env*` 默认被 Git 忽略，只有不含密钥的 `.env.example` 允许提交。
 
-> **注意**：`.env` 文件和 SQLite 数据库文件均不会提交到 GitHub。
+## 数据模型
 
-## 关于 AI 模块
+- `Customer`：联系方式、来源、状态、意向等级、跟进时间、备注和 AI 摘要
+- `Conversation`：客户、人工和 AI 的消息内容及时间
+- `StatusLog`：状态来源、目标状态、操作者、备注和时间
+- `KnowledgeBase`：分类、标题、正文、排序、启用状态和更新时间
 
-当前 AI 接待使用 **MockAiProvider**（规则引擎模拟），支持：
+## 主要接口
 
-- 意图识别：询价、合作、投诉、咨询等 9 种意图分类
-- 需求提取：自动识别项目类型、功能需求、预算范围、工期预期
-- 风险标记：低预算、紧急交付、意向不清等风险自动检测
-- 知识库检索：基于关键词匹配检索相关知识库条目作为回复依据
+- `GET/POST /api/customers`
+- `GET/PUT/DELETE /api/customers/:id`
+- `GET/POST /api/customers/:id/chats`
+- `POST /api/customers/:id/ai-chat`
+- `GET /api/customers/:id/status`
+- `GET/POST /api/knowledge`
+- `GET/PUT/DELETE /api/knowledge/:id`
+- `GET /api/dashboard`
 
-系统已设计 `LLMProvider` 接口，接入真实 LLM（如 OpenAI、Claude）只需：
+这些接口当前全部无鉴权，仅供本地应用调用。
 
-1. 实现 `LLMProvider` 接口的 `chat()` 方法
-2. 在 `src/lib/services/ai.service.ts` 中替换 `MockAiProvider` 实例
-3. 配置 `.env` 中的 LLM 相关变量
+## 当前未实现
 
-## 截图
+- 登录、鉴权、权限控制和多租户隔离
+- 生产数据库、数据迁移、备份和恢复策略
+- 请求限流、审计日志和完整可观测性
+- embedding、向量数据库和语义检索
+- 外部客户消息渠道和主动通知
+- SSE/流式输出
+- 客户数据导入导出
+- 自动化测试套件
+- 生产部署和自动部署流程
 
-<!-- 截图待补充 — 启动项目后截取以下页面 -->
-
-| 控制面板 | 客户列表 |
-|:---:|:---:|
-| ![Dashboard](screenshots/dashboard.png) | ![客户列表](screenshots/customers.png) |
-
-| 客户详情 | AI 接待对话 |
-|:---:|:---:|
-| ![客户详情](screenshots/customer-detail.png) | ![AI 接待](screenshots/ai-chat.png) |
-
-## 项目结构
-
-```
-src/
-├── app/
-│   ├── page.tsx                  # 控制面板
-│   ├── customers/
-│   │   ├── page.tsx              # 客户列表
-│   │   ├── new/page.tsx          # 新建客户
-│   │   └── [id]/page.tsx         # 客户详情（编辑/状态/对话/AI 聊天）
-│   ├── knowledge/page.tsx        # 知识库管理
-│   └── api/                      # REST API 路由
-├── components/ui/                # shadcn/ui 组件
-└── lib/
-    ├── ai/
-    │   ├── provider.ts           # LLMProvider 接口
-    │   ├── mock.ts               # 规则引擎 Mock 实现
-    │   └── prompts.ts            # AI 系统提示词
-    ├── services/                 # 业务逻辑层
-    ├── types/index.ts            # 类型定义与状态流转规则
-    ├── db.ts                     # Prisma 单例
-    └── utils.ts                  # 工具函数
-prisma/
-├── schema.prisma                # 数据模型
-├── seed.ts                      # 种子数据
-└── dev.db                       # SQLite 数据库（不提交）
-```
-
-## 后续规划
-
-- [ ] 接入真实 OpenAI-compatible API
-- [ ] 对话流式输出 (SSE)
-- [ ] 用户认证与权限管理
-- [ ] 客户数据导出 (CSV)
-- [ ] 部署到 Vercel / Railway
-- [ ] 国际化 (i18n)
-
-## License
-
-[MIT](LICENSE)
+在完成认证、安全审查和生产数据方案之前，不建议将本项目暴露在公网。

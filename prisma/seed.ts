@@ -1,52 +1,54 @@
 import { prisma } from "../src/lib/db";
 
+// 以下内容全部是虚构 Demo 数据，仅用于本地界面和流程演示。
+// 不代表真实客户、真实项目、真实成交、真实报价或已验证案例。
 const knowledgeData = [
   {
     category: "service",
     title: "网站开发",
-    content: "可以。我们提供企业官网、展示型网站、Landing Page、个人品牌网站等类型的开发服务。技术栈以 Next.js 为主，支持响应式适配。具体方案需要根据您的需求评估。",
+    content: "虚构 Demo 服务范围可包括企业官网、展示型网站、Landing Page 和个人品牌网站，并以 Next.js、响应式适配作为示例技术要求。该描述仅用于演示需求问答。",
     sortOrder: 1,
     isActive: true,
   },
   {
     category: "service",
     title: "小程序开发",
-    content: "支持微信小程序的开发，主要面向轻量级业务场景，比如预约系统、产品展示、简单商城等。具体是否适合您的场景，老板会根据需求判断。",
+    content: "虚构 Demo 服务范围可包括预约、产品展示和简单商城等轻量小程序场景。该描述仅用于演示分类检索和需求追问。",
     sortOrder: 2,
     isActive: true,
   },
   {
     category: "service",
     title: "自动化工具",
-    content: "可以评估。我们接过一些数据处理自动化、定时任务、API 对接、内部工具类的需求。具体要看场景复杂度，建议您先说说想解决什么问题。",
+    content: "虚构 Demo 服务范围可包括数据处理自动化、定时任务、API 对接和内部工具，并通过追问了解场景复杂度。该描述不代表实际项目经验。",
     sortOrder: 3,
     isActive: true,
   },
   {
     category: "service",
     title: "AI 相关项目",
-    content: "有这方面的经验，比如智能客服对接、AI 内容生成集成、数据分析可视化等。具体方案需要老板评估可行性后给您反馈。",
+    content: "虚构 Demo 服务范围可包括智能回复、AI 内容生成集成和数据分析可视化，并提示由人工评估可行性。该描述不代表实际项目经验或能力验证。",
     sortOrder: 4,
     isActive: true,
   },
   {
     category: "price",
     title: "网站开发价格区间",
-    content: "根据我们过往项目，简单展示型网站一般在几千元，功能型网站（带后台管理、用户系统等）一般在一到几万元。具体价格取决于页面数量、功能复杂度和设计要求，最终以老板报价为准。",
+    content: "以下为本地 Demo 的虚构价格口径：简单展示型网站可设为几千元区间，功能型网站可设为一到几万元区间。该内容仅用于演示 AI 如何引用知识库，不构成真实报价或商业承诺。",
     sortOrder: 1,
     isActive: true,
   },
   {
     category: "price",
     title: "小程序价格区间",
-    content: "轻量级小程序（展示为主）一般几千元起，带业务逻辑的小程序一般在一万到几万之间。复杂度不同价格差异较大，老板会根据您的具体需求报价。",
+    content: "以下为本地 Demo 的虚构价格口径：展示型小程序可设为几千元区间，带业务逻辑的小程序可设为一到几万元区间。该内容仅用于演示，不构成真实报价。",
     sortOrder: 2,
     isActive: true,
   },
   {
     category: "price",
     title: "自动化工具价格区间",
-    content: "简单的数据处理脚本或定时任务类需求，费用一般较低。涉及多系统对接、复杂业务逻辑的工具，费用会高一些。建议您先说清楚需求，老板会给您一个准确的报价。",
+    content: "以下为本地 Demo 的虚构价格口径：简单脚本与多系统业务工具可使用不同报价区间。该条目只用于演示需求收集和知识库问答，不构成真实报价。",
     sortOrder: 3,
     isActive: true,
   },
@@ -109,41 +111,42 @@ const knowledgeData = [
   {
     category: "faq",
     title: "有案例可以看吗",
-    content: "我可以给您介绍一些过往的项目类型。详细的案例展示老板会在正式沟通时分享给您。",
+    content: "本地 Demo 不包含可验证的真实案例。该条目用于演示系统在缺少案例资料时应转由人工补充，而不是虚构项目经历。",
     sortOrder: 5,
     isActive: true,
   },
   {
     category: "case",
-    title: "企业官网案例",
-    content: "我们做过多个行业的企业官网，包括科技公司、咨询公司、个人品牌等。主要功能是公司介绍、团队展示、服务说明、联系方式等。采用响应式设计，手机端体验良好。",
+    title: "企业官网演示场景",
+    content: "虚构 Demo 场景：某展示型企业官网包含公司介绍、团队展示、服务说明和联系方式，并要求响应式适配。该描述仅用于演示知识库检索，不对应真实客户或已交付项目。",
     sortOrder: 1,
     isActive: true,
   },
   {
     category: "case",
-    title: "内部工具案例",
-    content: "有的。比如给客户做过一个简单的数据看板工具，用来汇总多个平台的数据并生成日报。也做过一个自动化脚本，定时从指定来源抓取数据并整理成表格。",
+    title: "内部工具演示场景",
+    content: "虚构 Demo 场景：一个内部数据看板汇总多个来源并生成日报，另一个定时任务整理指定来源的数据。该描述不对应真实客户、真实成交或已交付项目。",
     sortOrder: 2,
     isActive: true,
   },
   {
     category: "case",
-    title: "小程序案例",
-    content: "做过预约类小程序（客户在线预约服务时间）和展示类小程序（产品目录浏览）。功能相对轻量，注重用户体验和简洁交互。",
+    title: "小程序演示场景",
+    content: "虚构 Demo 场景：预约类小程序用于选择服务时间，展示类小程序用于浏览产品目录。该描述只用于本地功能演示，不是实际客户案例。",
     sortOrder: 3,
     isActive: true,
   },
   {
     category: "case",
-    title: "AI 集成案例",
-    content: "有的。比如将 AI 能力集成到现有的业务系统中，实现智能回复、内容生成、数据摘要等功能。也做过 AI 辅助的客服对话系统。具体案例老板会根据您的需求对应分享。",
+    title: "AI 集成演示场景",
+    content: "虚构 Demo 场景：在业务系统中演示智能回复、内容生成或数据摘要等能力。该条目用于测试知识库检索和模型回答，不代表真实客户案例或能力验证结果。",
     sortOrder: 4,
     isActive: true,
   },
 ];
 
 async function main() {
+  console.log("注意：即将清空 knowledge_base 并写入虚构 Demo 数据。");
   console.log("开始清空 knowledge_base 表...");
   await prisma.knowledgeBase.deleteMany();
   console.log("knowledge_base 表已清空");
@@ -151,8 +154,13 @@ async function main() {
   console.log(`开始导入 ${knowledgeData.length} 条知识库数据...`);
 
   for (const item of knowledgeData) {
-    await prisma.knowledgeBase.create({ data: item });
-    console.log(`  ✓ [${item.category}] ${item.title}`);
+    const demoItem = {
+      ...item,
+      title: `[Demo] ${item.title}`,
+      content: `虚构 Demo 数据：${item.content}`,
+    };
+    await prisma.knowledgeBase.create({ data: demoItem });
+    console.log(`  ✓ [${demoItem.category}] ${demoItem.title}`);
   }
 
   const count = await prisma.knowledgeBase.count();

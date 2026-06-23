@@ -211,6 +211,10 @@ export interface AiAnalysisResult {
   intent_level: IntentLevel;
   is_effective_lead: boolean;
   need_human: boolean;
+  project_type: string | null;
+  budget_range: string | null;
+  timeline: string | null;
+  requirements: string[];
   suggested_action: SuggestedAction;
   summary: string | null;
   missing_info: MissingInfoKey[];

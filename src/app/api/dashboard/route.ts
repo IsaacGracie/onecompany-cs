@@ -20,10 +20,10 @@ export async function GET() {
     statsRows,
     todayFollowUps,
     overdueFollowUps,
-    aiNeedConfirm,
-    quotedOverdue,
-    wonNotDelivering,
-    deliveredNeedAfterSales,
+    aiSummaryCustomers,
+    quotedStale,
+    wonStale,
+    deliveredStale,
     afterSalesCustomers,
   ] = await Promise.all([
     prisma.customer.count(),
@@ -49,7 +49,7 @@ export async function GET() {
       orderBy: { nextFollowAt: "asc" },
       select: { id: true, nickname: true, status: true, nextFollowAt: true, intentLevel: true },
     }),
-    // AI 建议需求确认：serving 且 aiSummary 不为空
+    // 待人工确认信息：serving 且已有 AI 摘要
     prisma.customer.findMany({
       where: {
         status: "serving",
@@ -58,7 +58,7 @@ export async function GET() {
       orderBy: { updatedAt: "desc" },
       select: { id: true, nickname: true, status: true, aiSummary: true, updatedAt: true },
     }),
-    // 已报价 7 天未跟进：quoted 且 updatedAt < 7天前
+    // 已报价且最近 7 天未更新
     prisma.customer.findMany({
       where: {
         status: "quoted",
@@ -67,7 +67,7 @@ export async function GET() {
       orderBy: { updatedAt: "asc" },
       select: { id: true, nickname: true, status: true, updatedAt: true },
     }),
-    // 已成交 3 天未开始交付：won 且 updatedAt < 3天前
+    // 已成交且最近 3 天未更新
     prisma.customer.findMany({
       where: {
         status: "won",
@@ -76,7 +76,7 @@ export async function GET() {
       orderBy: { updatedAt: "asc" },
       select: { id: true, nickname: true, status: true, updatedAt: true },
     }),
-    // 已交付 7 天待确认售后：delivered 且 updatedAt < 7天前
+    // 已交付且最近 7 天未更新
     prisma.customer.findMany({
       where: {
         status: "delivered",
@@ -108,10 +108,10 @@ export async function GET() {
     stats,
     todayFollowUps,
     overdueFollowUps,
-    aiNeedConfirm,
-    quotedOverdue,
-    wonNotDelivering,
-    deliveredNeedAfterSales,
+    aiSummaryCustomers,
+    quotedStale,
+    wonStale,
+    deliveredStale,
     afterSalesCustomers,
   });
 }

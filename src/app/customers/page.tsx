@@ -72,42 +72,11 @@ export default function CustomersPage() {
     }
   }, [page, keyword, statusFilter, intentFilter, sourceFilter]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- This callback synchronizes list state with the customer API. */
   useEffect(() => {
-    let ignore = false;
-
-    async function loadCustomers() {
-      await Promise.resolve();
-      if (ignore) return;
-
-      setLoading(true);
-      const params = new URLSearchParams();
-      params.set("page", String(page));
-      params.set("pageSize", "10");
-      if (keyword) params.set("keyword", keyword);
-      if (statusFilter) params.set("status", statusFilter);
-      if (intentFilter) params.set("intentLevel", intentFilter);
-      if (sourceFilter) params.set("source", sourceFilter);
-
-      try {
-        const res = await fetch(`/api/customers?${params.toString()}`);
-        const data: CustomerListResponse = await res.json();
-        if (ignore) return;
-        setCustomers(data.data);
-        setTotal(data.total);
-        setTotalPages(data.totalPages);
-      } catch (err) {
-        console.error("Failed to fetch customers:", err);
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    }
-
-    void loadCustomers();
-
-    return () => {
-      ignore = true;
-    };
-  }, [page, keyword, statusFilter, intentFilter, sourceFilter]);
+    fetchCustomers();
+  }, [fetchCustomers]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
